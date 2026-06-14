@@ -1,4 +1,4 @@
-// Command weibo is a single-binary command line for weibo-cli.
+// Command weibo is a single-binary command line for Weibo hot search.
 package main
 
 import (
@@ -8,7 +8,7 @@ import (
 	"syscall"
 
 	"github.com/charmbracelet/fang"
-	"github.com/tamnd/weibo-cli-cli/cli"
+	"github.com/tamnd/weibo-cli/cli"
 )
 
 func main() {

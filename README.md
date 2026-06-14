@@ -9,10 +9,10 @@ tools. No API key, nothing to run alongside it.
 ## Install
 
 ```bash
-go install github.com/tamnd/weibo-cli-cli/cmd/weibo@latest
+go install github.com/tamnd/weibo-cli/cmd/weibo@latest
 ```
 
-Or grab a prebuilt binary from the [releases](https://github.com/tamnd/weibo-cli-cli/releases), or run
+Or grab a prebuilt binary from the [releases](https://github.com/tamnd/weibo-cli/releases), or run
 the container image:
 
 ```bash
