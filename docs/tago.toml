@@ -1,0 +1,10 @@
+title       = "weibo"
+baseURL     = "https://weibo-cli-cli.tamnd.com/"
+description = "Browse Weibo hot search topics (微博热搜)"
+contentDir  = "content"
+outputDir   = "public"
+theme       = "tago-doks"
+syntaxHighlight = "true"
+
+[params]
+github = "https://github.com/tamnd/weibo-cli-cli"
