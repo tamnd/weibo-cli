@@ -1,95 +1,92 @@
-// Package weibo is the library behind the weibo command: the HTTP client,
-// request shaping, and the typed data models for Weibo hot search.
+// Package weibo is the library behind the weibo command: the HTTP client and
+// the typed data models for Weibo public surfaces.
 //
-// The client fetches the public hot-search JSON endpoint at
-// https://weibo.com/ajax/side/hotSearch. No authentication or cookies are
-// required. It sets a real User-Agent and Referer, paces requests, and retries
-// transient 429/5xx errors with exponential backoff.
+// Two hosts are used: weibo.com for the hot-rank board and search suggestions,
+// and m.weibo.cn for post detail and comments. Each needs different headers.
+// No cookies or authentication are required for any of these surfaces.
 package weibo
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"sync"
 	"time"
 )
 
-// DefaultUserAgent identifies the client to Weibo.
-const DefaultUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36 weibo-cli/dev (+https://github.com/tamnd/weibo-cli)"
+// DefaultUserAgent is a desktop Chrome string for weibo.com endpoints.
+const DefaultUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 
-// Config holds constructor parameters.
+// mobileUserAgent is a mobile Safari string for m.weibo.cn endpoints.
+const mobileUserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+
+// ErrWalled means the API returned ok:-100, meaning the surface requires a
+// logged-in session. User profile and post timeline are examples.
+var ErrWalled = errors.New("Weibo requires a logged-in session for this surface (exit 4)")
+
+// ErrNotFound means the post or resource does not exist.
+var ErrNotFound = errors.New("not found")
+
+// Config holds the tunable client settings.
 type Config struct {
-	BaseURL   string
-	UserAgent string
-	Rate      time.Duration
-	Retries   int
-	Timeout   time.Duration
+	BaseURL       string
+	MobileBaseURL string
+	UserAgent     string
+	Rate          time.Duration
+	Retries       int
+	Timeout       time.Duration
 }
 
 // DefaultConfig returns sensible defaults.
 func DefaultConfig() Config {
 	return Config{
-		BaseURL:   "https://weibo.com",
-		UserAgent: DefaultUserAgent,
-		Rate:      200 * time.Millisecond,
-		Retries:   3,
-		Timeout:   30 * time.Second,
+		BaseURL:       "https://weibo.com",
+		MobileBaseURL: "https://m.weibo.cn",
+		UserAgent:     DefaultUserAgent,
+		Rate:          500 * time.Millisecond,
+		Retries:       3,
+		Timeout:       30 * time.Second,
 	}
 }
 
-// Client talks to the Weibo public API.
+// Client talks to Weibo's public JSON API.
 type Client struct {
-	cfg        Config
-	httpClient *http.Client
-	mu         sync.Mutex
-	last       time.Time
+	cfg  Config
+	http *http.Client
+	mu   sync.Mutex
+	last time.Time
 }
 
-// NewClient returns a Client with the given config.
+// NewClient builds a Client from cfg.
 func NewClient(cfg Config) *Client {
+	if cfg.UserAgent == "" {
+		cfg.UserAgent = DefaultUserAgent
+	}
+	if cfg.BaseURL == "" {
+		cfg.BaseURL = "https://weibo.com"
+	}
+	if cfg.MobileBaseURL == "" {
+		cfg.MobileBaseURL = "https://m.weibo.cn"
+	}
 	return &Client{
-		cfg:        cfg,
-		httpClient: &http.Client{Timeout: cfg.Timeout},
+		cfg:  cfg,
+		http: &http.Client{Timeout: cfg.Timeout},
 	}
 }
 
-// HotSearch fetches the current Weibo hot search list.
-// If limit > 0, only the first limit items are returned.
-func (c *Client) HotSearch(ctx context.Context, limit int) ([]HotItem, error) {
-	endpoint := c.cfg.BaseURL + "/ajax/side/hotSearch"
-	b, err := c.get(ctx, endpoint)
-	if err != nil {
-		return nil, err
-	}
-
-	var resp hotSearchResponse
-	if err := json.Unmarshal(b, &resp); err != nil {
-		return nil, fmt.Errorf("decode hot search: %w", err)
-	}
-
-	items := resp.Data.Realtime
-	if limit > 0 && limit < len(items) {
-		items = items[:limit]
-	}
-
-	out := make([]HotItem, 0, len(items))
-	for i, w := range items {
-		out = append(out, wireToHotItem(w, i+1, w.Word))
-	}
-	return out, nil
+// getDesktop performs a GET to a weibo.com endpoint with desktop browser headers.
+func (c *Client) getDesktop(ctx context.Context, rawURL string) ([]byte, error) {
+	return c.get(ctx, rawURL, c.cfg.UserAgent, "https://weibo.com/", false)
 }
 
-// topicURL returns the Weibo search URL for a hot-search topic word.
-func topicURL(word string) string {
-	return "https://s.weibo.com/weibo?q=%23" + url.QueryEscape(word) + "%23"
+// getMobile performs a GET to a m.weibo.cn endpoint with mobile browser headers.
+func (c *Client) getMobile(ctx context.Context, rawURL string) ([]byte, error) {
+	return c.get(ctx, rawURL, mobileUserAgent, "https://m.weibo.cn/", true)
 }
 
-// get performs a GET request with User-Agent, Referer, and retry logic.
-func (c *Client) get(ctx context.Context, rawURL string) ([]byte, error) {
+func (c *Client) get(ctx context.Context, rawURL, ua, referer string, mobile bool) ([]byte, error) {
 	var lastErr error
 	for attempt := 0; attempt <= c.cfg.Retries; attempt++ {
 		if attempt > 0 {
@@ -99,7 +96,7 @@ func (c *Client) get(ctx context.Context, rawURL string) ([]byte, error) {
 			case <-time.After(backoff(attempt)):
 			}
 		}
-		b, retry, err := c.do(ctx, rawURL)
+		b, retry, err := c.do(ctx, rawURL, ua, referer, mobile)
 		if err == nil {
 			return b, nil
 		}
@@ -111,17 +108,22 @@ func (c *Client) get(ctx context.Context, rawURL string) ([]byte, error) {
 	return nil, fmt.Errorf("get %s: %w", rawURL, lastErr)
 }
 
-func (c *Client) do(ctx context.Context, rawURL string) ([]byte, bool, error) {
+func (c *Client) do(ctx context.Context, rawURL, ua, referer string, mobile bool) ([]byte, bool, error) {
 	c.pace()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
 		return nil, false, err
 	}
-	req.Header.Set("User-Agent", c.cfg.UserAgent)
-	req.Header.Set("Referer", "https://weibo.com/")
-	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", ua)
+	req.Header.Set("Referer", referer)
+	req.Header.Set("Accept", "application/json, text/plain, */*")
+	req.Header.Set("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
+	if mobile {
+		req.Header.Set("MWeibo-Pwa", "1")
+		req.Header.Set("X-Requested-With", "XMLHttpRequest")
+	}
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.http.Do(req)
 	if err != nil {
 		return nil, true, err
 	}
@@ -156,7 +158,7 @@ func (c *Client) pace() {
 func backoff(attempt int) time.Duration {
 	d := time.Duration(attempt) * 500 * time.Millisecond
 	if d > 5*time.Second {
-		d = 5 * time.Second
+		return 5 * time.Second
 	}
 	return d
 }
