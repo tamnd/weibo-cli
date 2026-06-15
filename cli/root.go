@@ -4,6 +4,8 @@
 package cli
 
 import (
+	"os"
+
 	"github.com/tamnd/any-cli/kit"
 	"github.com/tamnd/weibo-cli/weibo"
 )
@@ -23,13 +25,24 @@ func NewApp() *kit.App {
 	app := kit.New(id, kit.WithDefaults(weibo.Defaults))
 	weibo.Register(app)
 
-	var userAgent string
+	var userAgent, cookie string
 	app.GlobalFlags(func(f *kit.FlagSet) {
 		f.StringVar(&userAgent, "user-agent", "", "override the User-Agent sent with each request")
+		f.StringVar(&cookie, "cookie", "", `session cookie ("SUB=xxx; SUBP=yyy") for gated surfaces; env: WEIBO_COOKIE`)
 	})
 	app.Finalize(func(c *kit.Config) {
 		if userAgent != "" {
 			c.UserAgent = userAgent
+		}
+		if c.Extra == nil {
+			c.Extra = map[string]string{}
+		}
+		ck := cookie
+		if ck == "" {
+			ck = os.Getenv("WEIBO_COOKIE")
+		}
+		if ck != "" {
+			c.Extra["cookie"] = ck
 		}
 	})
 

@@ -13,6 +13,8 @@ func registerOps(app *kit.App) {
 	registerStatus(app)
 	registerComments(app)
 	registerSuggest(app)
+	registerUser(app)
+	registerPosts(app)
 }
 
 func effectiveLimit(n, def int) int {
@@ -123,6 +125,65 @@ func registerSuggest(app *kit.App) {
 			return MapErr(err)
 		}
 		return emitAll(sugs, emit)
+	})
+}
+
+// --- user ---
+
+type userIn struct {
+	UID  string   `kit:"arg" help:"numeric user id or profile URL"`
+	Sess *Session `kit:"inject"`
+}
+
+func registerUser(app *kit.App) {
+	kit.Handle(app, kit.OpMeta{
+		Name: "user", Group: "read", Single: true,
+		Summary: "Weibo user profile (requires --cookie)",
+		Args:    []kit.Arg{{Name: "uid-or-url", Help: "numeric user id or profile URL"}},
+	}, func(ctx context.Context, in userIn, emit func(User) error) error {
+		uid, err := parseUID(in.UID)
+		if err != nil {
+			return errs.Usage("%s", err.Error())
+		}
+		in.Sess.Progressf("fetching profile for uid %s", uid)
+		u, err := in.Sess.Client.UserByID(ctx, uid)
+		if err != nil {
+			return MapErr(err)
+		}
+		return emit(u)
+	})
+}
+
+// --- posts ---
+
+type postsIn struct {
+	UID   string   `kit:"arg" help:"numeric user id or profile URL"`
+	Page  int      `kit:"flag" help:"page number (1-based)"`
+	Limit int      `kit:"flag,inherit" help:"max records"`
+	Sess  *Session `kit:"inject"`
+}
+
+func registerPosts(app *kit.App) {
+	kit.Handle(app, kit.OpMeta{
+		Name: "posts", Group: "read",
+		Summary: "Posts from a user's timeline (requires --cookie)",
+		Args:    []kit.Arg{{Name: "uid-or-url", Help: "numeric user id or profile URL"}},
+	}, func(ctx context.Context, in postsIn, emit func(Post) error) error {
+		uid, err := parseUID(in.UID)
+		if err != nil {
+			return errs.Usage("%s", err.Error())
+		}
+		page := in.Page
+		if page < 1 {
+			page = 1
+		}
+		limit := effectiveLimit(in.Limit, 10)
+		in.Sess.Progressf("fetching posts for uid %s page %d", uid, page)
+		posts, err := in.Sess.Client.PostsByUID(ctx, uid, page, limit)
+		if err != nil {
+			return MapErr(err)
+		}
+		return emitAll(posts, emit)
 	})
 }
 

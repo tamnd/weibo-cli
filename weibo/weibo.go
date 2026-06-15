@@ -34,9 +34,12 @@ type Config struct {
 	BaseURL       string
 	MobileBaseURL string
 	UserAgent     string
-	Rate          time.Duration
-	Retries       int
-	Timeout       time.Duration
+	// Cookie is an optional "SUB=xxx; SUBP=yyy" string pasted from a logged-in
+	// browser session. Without it, user and posts exit 4 (walled).
+	Cookie  string
+	Rate    time.Duration
+	Retries int
+	Timeout time.Duration
 }
 
 // DefaultConfig returns sensible defaults.
@@ -121,6 +124,9 @@ func (c *Client) do(ctx context.Context, rawURL, ua, referer string, mobile bool
 	if mobile {
 		req.Header.Set("MWeibo-Pwa", "1")
 		req.Header.Set("X-Requested-With", "XMLHttpRequest")
+	}
+	if c.cfg.Cookie != "" {
+		req.Header.Set("Cookie", c.cfg.Cookie)
 	}
 
 	resp, err := c.http.Do(req)

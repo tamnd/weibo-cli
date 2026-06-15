@@ -88,6 +88,9 @@ func newClient(_ context.Context, c kit.Config) (any, error) {
 	if c.Retries > 0 {
 		cfg.Retries = c.Retries
 	}
+	if v, ok := c.Extra["cookie"]; ok && v != "" {
+		cfg.Cookie = v
+	}
 	return &Session{Client: NewClient(cfg), Quiet: c.Quiet}, nil
 }
 

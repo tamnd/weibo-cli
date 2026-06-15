@@ -48,6 +48,46 @@ func parseStatusID(input string) (string, error) {
 	return "", fmt.Errorf("cannot extract a numeric post id from %q", input)
 }
 
+// ParseUID extracts the numeric user id from a full profile URL or a bare
+// numeric string. Accepted forms:
+//
+//	1234567890
+//	https://weibo.com/u/1234567890
+//	https://m.weibo.cn/u/1234567890
+//	https://m.weibo.cn/profile/1234567890
+//
+// ParseUID is the exported form used by tests and ops.go.
+func ParseUID(input string) (string, error) { return parseUID(input) }
+
+func parseUID(input string) (string, error) {
+	input = strings.TrimSpace(input)
+	if input == "" {
+		return "", fmt.Errorf("user id is required")
+	}
+	if !strings.Contains(input, "/") {
+		if !isNumeric(input) {
+			return "", fmt.Errorf("user id must be a numeric id or a weibo profile URL; got %q", input)
+		}
+		return input, nil
+	}
+	u, err := url.Parse(input)
+	if err != nil {
+		return "", fmt.Errorf("invalid URL %q: %w", input, err)
+	}
+	seg := strings.Split(strings.TrimPrefix(u.Path, "/"), "/")
+	for i, s := range seg {
+		if (s == "u" || s == "profile") && i+1 < len(seg) && isNumeric(seg[i+1]) {
+			return seg[i+1], nil
+		}
+	}
+	// last numeric path segment
+	last := seg[len(seg)-1]
+	if isNumeric(last) {
+		return last, nil
+	}
+	return "", fmt.Errorf("cannot extract a numeric user id from %q", input)
+}
+
 func isNumeric(s string) bool {
 	if s == "" {
 		return false

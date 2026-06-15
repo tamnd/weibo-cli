@@ -1,6 +1,7 @@
 package weibo
 
 import (
+	"fmt"
 	"net/url"
 	"regexp"
 	"strings"
@@ -90,5 +91,38 @@ func suggestionFrom(w wireSuggestion) Suggestion {
 		Word:  w.Suggestion,
 		Count: w.Count,
 		IsHot: w.TopFlag == 2,
+	}
+}
+
+func userFrom(w wireProfileUser) User {
+	return User{
+		ID:          w.ID,
+		ScreenName:  w.ScreenName,
+		Description: w.Description,
+		Verified:    w.Verified,
+		VerifiedFor: w.VerifiedReason,
+		Gender:      w.Gender,
+		Location:    w.Location,
+		Followers:   w.FollowersCount,
+		Following:   w.FollowCount,
+		Posts:       w.StatusesCount,
+		Avatar:      w.AvatarHD,
+		URL:         "https://m.weibo.cn/u/" + fmt.Sprintf("%d", w.ID),
+	}
+}
+
+func postFrom(w wireStatus) Post {
+	return Post{
+		ID:        w.ID,
+		Bid:       w.Bid,
+		Text:      stripHTML(w.Text),
+		CreatedAt: weiboTime(w.CreatedAt),
+		Source:    w.Source,
+		Reposts:   w.Reposts,
+		Comments:  w.Comments,
+		Likes:     w.Likes,
+		IsLong:    w.IsLong,
+		PicNum:    w.PicNum,
+		URL:       statusURL(w.ID),
 	}
 }
