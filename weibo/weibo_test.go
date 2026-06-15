@@ -10,85 +10,132 @@ import (
 	"github.com/tamnd/weibo-cli/weibo"
 )
 
-const mockHotSearchResponse = `{
+// Hot search fixture mirrors the real wire shape from weibo.com/ajax/side/hotSearch.
+const mockHotResponse = `{
   "ok": 1,
   "data": {
     "realtime": [
       {
-        "rank": 0,
-        "word": "巴西醒醒 这是世界杯",
-        "note": "巴西醒醒 这是世界杯",
-        "num": 11551545,
-        "category": "",
-        "label_name": "爆"
+        "rank": 0, "realpos": 1,
+        "word": "山姆被约谈", "num": 2453012,
+        "label_name": "热", "word_scheme": "#山姆被约谈#",
+        "flag_desc": "", "is_ad": 0
       },
       {
-        "rank": 1,
-        "word": "中国女篮",
-        "note": "中国女篮",
-        "num": 8234567,
-        "category": "体育",
-        "label_name": "热"
+        "rank": 1, "realpos": 2,
+        "word": "严浩翔贺峻霖", "num": 322924,
+        "label_name": "新", "word_scheme": "#严浩翔贺峻霖#",
+        "flag_desc": "综艺", "is_ad": 0
       },
       {
-        "rank": 2,
-        "word": "新能源车型发布",
-        "note": "新能源车型发布",
-        "num": 5100000,
-        "category": "科技",
-        "label_name": "新"
+        "rank": 2, "realpos": 2,
+        "word": "品牌广告", "num": 815180,
+        "label_name": "商", "word_scheme": "#品牌广告#",
+        "flag_desc": "", "is_ad": 1,
+        "id": 342321
       }
     ]
+  }
+}`
+
+// Status fixture mirrors m.weibo.cn/statuses/show response.
+const mockStatusResponse = `{
+  "ok": 1,
+  "data": {
+    "id": "5309997458393240",
+    "bid": "R4c4VzdsQ",
+    "text": "【时政微视频 | <a href=\"...\"><span class=\"surl-text\">#共产党员习近平#</span></a>】入党52年。<br />为人民服务。",
+    "created_at": "Mon Jun 15 09:05:12 +0800 2026",
+    "source": "微博视频号",
+    "reposts_count": 334,
+    "comments_count": 263,
+    "attitudes_count": 1552,
+    "isLongText": true,
+    "pic_num": 0,
+    "user": {
+      "id": 2656274875,
+      "screen_name": "央视新闻"
+    }
+  }
+}`
+
+// Comments fixture mirrors m.weibo.cn/comments/hotflow response.
+const mockCommentsResponse = `{
+  "ok": 1,
+  "data": {
+    "data": [
+      {
+        "id": "5309998831766407",
+        "floor_number": 19,
+        "text": "为人民服务",
+        "created_at": "Mon Jun 15 09:10:39 +0800 2026",
+        "source": "来自安徽",
+        "like_count": 15,
+        "user": { "id": 5274035875, "screen_name": "love梦妍" }
+      }
+    ],
+    "max_id": 0,
+    "total_number": 263
+  }
+}`
+
+// Suggest fixture mirrors weibo.com/ajax/side/search response.
+const mockSuggestResponse = `{
+  "ok": 1,
+  "data": {
+    "hotquery": [
+      { "suggestion": "山姆被约谈", "count": 2453012, "top_flag": 2 },
+      { "suggestion": "山姆回应", "count": 224813, "top_flag": 0 }
+    ],
+    "history": [], "real_hot": [], "query_relates": [], "user": [], "users": []
   }
 }`
 
 func newTestClient(ts *httptest.Server) *weibo.Client {
 	cfg := weibo.DefaultConfig()
 	cfg.BaseURL = ts.URL
+	cfg.MobileBaseURL = ts.URL
 	cfg.Rate = 0
 	return weibo.NewClient(cfg)
 }
 
-func TestHotSearchSendsUserAgent(t *testing.T) {
+// ─── hot ─────────────────────────────────────────────────────────────────────
+
+func TestHotSendsUserAgent(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("User-Agent") == "" {
 			t.Error("request carried no User-Agent")
 		}
-		_, _ = w.Write([]byte(mockHotSearchResponse))
+		_, _ = w.Write([]byte(mockHotResponse))
 	}))
 	defer srv.Close()
-
-	c := newTestClient(srv)
-	_, err := c.HotSearch(context.Background(), 0)
+	_, err := newTestClient(srv).HotSearch(context.Background(), 0)
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 
-func TestHotSearchSendsReferer(t *testing.T) {
+func TestHotSendsReferer(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Referer") == "" {
-			t.Error("request carried no Referer header")
+			t.Error("request carried no Referer")
 		}
-		_, _ = w.Write([]byte(mockHotSearchResponse))
+		_, _ = w.Write([]byte(mockHotResponse))
 	}))
 	defer srv.Close()
-
-	c := newTestClient(srv)
-	_, err := c.HotSearch(context.Background(), 0)
+	_, err := newTestClient(srv).HotSearch(context.Background(), 0)
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 
-func TestHotSearchParsesResults(t *testing.T) {
+func TestHotParses(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(mockHotSearchResponse))
+		_, _ = w.Write([]byte(mockHotResponse))
 	}))
 	defer srv.Close()
 
-	c := newTestClient(srv)
-	items, err := c.HotSearch(context.Background(), 0)
+	items, err := newTestClient(srv).HotSearch(context.Background(), 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,41 +143,44 @@ func TestHotSearchParsesResults(t *testing.T) {
 		t.Fatalf("got %d items, want 3", len(items))
 	}
 
-	it := items[0]
-	if it.Rank != 1 {
-		t.Errorf("rank = %d, want 1 (1-based)", it.Rank)
+	first := items[0]
+	if first.Rank != 1 {
+		t.Errorf("rank = %d, want 1", first.Rank)
 	}
-	if it.Word != "巴西醒醒 这是世界杯" {
-		t.Errorf("word = %q", it.Word)
+	if first.Word != "山姆被约谈" {
+		t.Errorf("word = %q", first.Word)
 	}
-	if it.Heat != 11551545 {
-		t.Errorf("heat = %d, want 11551545", it.Heat)
+	if first.Heat != 2453012 {
+		t.Errorf("heat = %d, want 2453012", first.Heat)
 	}
-	if it.Label != "爆" {
-		t.Errorf("label = %q, want 爆", it.Label)
+	if first.Label != "热" {
+		t.Errorf("label = %q, want 热", first.Label)
 	}
-	if it.URL == "" {
+	if first.IsAd {
+		t.Error("first item should not be an ad")
+	}
+	if first.URL == "" {
 		t.Error("url is empty")
 	}
 
-	// Second item: category present
-	it2 := items[1]
-	if it2.Rank != 2 {
-		t.Errorf("rank = %d, want 2", it2.Rank)
+	second := items[1]
+	if second.Category != "综艺" {
+		t.Errorf("category = %q, want 综艺", second.Category)
 	}
-	if it2.Category != "体育" {
-		t.Errorf("category = %q, want 体育", it2.Category)
+
+	ad := items[2]
+	if !ad.IsAd {
+		t.Error("third item should be an ad")
 	}
 }
 
-func TestHotSearchLimit(t *testing.T) {
+func TestHotLimit(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(mockHotSearchResponse))
+		_, _ = w.Write([]byte(mockHotResponse))
 	}))
 	defer srv.Close()
 
-	c := newTestClient(srv)
-	items, err := c.HotSearch(context.Background(), 1)
+	items, err := newTestClient(srv).HotSearch(context.Background(), 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +189,7 @@ func TestHotSearchLimit(t *testing.T) {
 	}
 }
 
-func TestHotSearchRetriesOn503(t *testing.T) {
+func TestHotRetriesOn503(t *testing.T) {
 	var hits int
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hits++
@@ -147,7 +197,7 @@ func TestHotSearchRetriesOn503(t *testing.T) {
 			w.WriteHeader(http.StatusServiceUnavailable)
 			return
 		}
-		_, _ = w.Write([]byte(mockHotSearchResponse))
+		_, _ = w.Write([]byte(mockHotResponse))
 	}))
 	defer srv.Close()
 
@@ -170,15 +220,180 @@ func TestHotSearchRetriesOn503(t *testing.T) {
 	}
 }
 
-func TestHotSearchHTTPError(t *testing.T) {
+func TestHotHTTPError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
 	}))
 	defer srv.Close()
-
-	c := newTestClient(srv)
-	_, err := c.HotSearch(context.Background(), 0)
+	_, err := newTestClient(srv).HotSearch(context.Background(), 0)
 	if err == nil {
-		t.Fatal("expected error on 403, got nil")
+		t.Fatal("expected error on 403")
 	}
+}
+
+// ─── status ──────────────────────────────────────────────────────────────────
+
+func TestStatusParses(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(mockStatusResponse))
+	}))
+	defer srv.Close()
+
+	s, err := newTestClient(srv).StatusByID(context.Background(), "5309997458393240")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.ID != "5309997458393240" {
+		t.Errorf("id = %q", s.ID)
+	}
+	if s.Bid != "R4c4VzdsQ" {
+		t.Errorf("bid = %q", s.Bid)
+	}
+	if s.Likes != 1552 {
+		t.Errorf("likes = %d, want 1552", s.Likes)
+	}
+	if s.Username != "央视新闻" {
+		t.Errorf("username = %q", s.Username)
+	}
+	// HTML should be stripped from text
+	if s.Text == "" {
+		t.Error("text is empty after strip")
+	}
+	if contains(s.Text, "<a ") || contains(s.Text, "<span") {
+		t.Errorf("text still contains HTML tags: %q", s.Text)
+	}
+	// Date should be reformatted
+	if s.CreatedAt != "2026-06-15 01:05:12" {
+		t.Errorf("created_at = %q, want 2026-06-15 01:05:12 (UTC)", s.CreatedAt)
+	}
+	if s.URL == "" {
+		t.Error("url is empty")
+	}
+}
+
+func TestStatusSendsMobileHeaders(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("MWeibo-Pwa") != "1" {
+			t.Errorf("missing MWeibo-Pwa header")
+		}
+		if r.Header.Get("X-Requested-With") != "XMLHttpRequest" {
+			t.Errorf("missing X-Requested-With header")
+		}
+		_, _ = w.Write([]byte(mockStatusResponse))
+	}))
+	defer srv.Close()
+	_, err := newTestClient(srv).StatusByID(context.Background(), "5309997458393240")
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// ─── comments ────────────────────────────────────────────────────────────────
+
+func TestCommentsParses(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(mockCommentsResponse))
+	}))
+	defer srv.Close()
+
+	comments, err := newTestClient(srv).Comments(context.Background(), "5309997458393240", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(comments) != 1 {
+		t.Fatalf("got %d comments, want 1", len(comments))
+	}
+	c := comments[0]
+	if c.ID != "5309998831766407" {
+		t.Errorf("id = %q", c.ID)
+	}
+	if c.Floor != 19 {
+		t.Errorf("floor = %d, want 19", c.Floor)
+	}
+	if c.Text != "为人民服务" {
+		t.Errorf("text = %q", c.Text)
+	}
+	if c.Likes != 15 {
+		t.Errorf("likes = %d, want 15", c.Likes)
+	}
+	if c.Source != "来自安徽" {
+		t.Errorf("source = %q", c.Source)
+	}
+	if c.Username != "love梦妍" {
+		t.Errorf("username = %q", c.Username)
+	}
+}
+
+// ─── suggest ─────────────────────────────────────────────────────────────────
+
+func TestSuggestParses(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(mockSuggestResponse))
+	}))
+	defer srv.Close()
+
+	sugs, err := newTestClient(srv).Suggest(context.Background(), "%E5%B1%B1%E5%A7%86", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sugs) != 2 {
+		t.Fatalf("got %d suggestions, want 2", len(sugs))
+	}
+	if sugs[0].Word != "山姆被约谈" {
+		t.Errorf("word = %q", sugs[0].Word)
+	}
+	if sugs[0].Count != 2453012 {
+		t.Errorf("count = %d, want 2453012", sugs[0].Count)
+	}
+	if !sugs[0].IsHot {
+		t.Error("first suggestion should be is_hot (top_flag==2)")
+	}
+	if sugs[1].IsHot {
+		t.Error("second suggestion should not be is_hot")
+	}
+}
+
+// ─── parseStatusID ───────────────────────────────────────────────────────────
+
+func TestParseStatusID(t *testing.T) {
+	cases := []struct {
+		input string
+		want  string
+		err   bool
+	}{
+		{"5309997458393240", "5309997458393240", false},
+		{"https://m.weibo.cn/detail/5309997458393240", "5309997458393240", false},
+		{"https://m.weibo.cn/status/5309997458393240", "5309997458393240", false},
+		{"", "", true},
+		{"notanumber", "", true},
+	}
+	for _, tc := range cases {
+		got, err := weibo.ParseStatusID(tc.input)
+		if tc.err {
+			if err == nil {
+				t.Errorf("ParseStatusID(%q) expected error", tc.input)
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("ParseStatusID(%q) error: %v", tc.input, err)
+			continue
+		}
+		if got != tc.want {
+			t.Errorf("ParseStatusID(%q) = %q, want %q", tc.input, got, tc.want)
+		}
+	}
+}
+
+func contains(s, sub string) bool {
+	return len(s) >= len(sub) && (s == sub || len(sub) == 0 || indexOf(s, sub) >= 0)
+}
+
+func indexOf(s, sub string) int {
+	for i := 0; i <= len(s)-len(sub); i++ {
+		if s[i:i+len(sub)] == sub {
+			return i
+		}
+	}
+	return -1
 }
