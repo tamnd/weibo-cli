@@ -13,6 +13,7 @@ import (
 //	https://m.weibo.cn/detail/5309997458393240
 //	https://m.weibo.cn/status/5309997458393240
 //	https://weibo.com/2656274875/R4c4VzdsQ  (bid form — rejected, needs fetch)
+//
 // ParseStatusID is the exported form used by tests and ops.go.
 func ParseStatusID(input string) (string, error) { return parseStatusID(input) }
 

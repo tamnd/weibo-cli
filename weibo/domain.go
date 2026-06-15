@@ -18,8 +18,8 @@ type Domain struct{}
 // Info describes the scheme and hostnames a pasted link is matched against.
 func (Domain) Info() kit.DomainInfo {
 	return kit.DomainInfo{
-		Scheme:  "weibo",
-		Hosts:   []string{"weibo.com", "www.weibo.com", "m.weibo.cn", "s.weibo.com"},
+		Scheme:   "weibo",
+		Hosts:    []string{"weibo.com", "www.weibo.com", "m.weibo.cn", "s.weibo.com"},
 		Identity: BaseIdentity(),
 	}
 }

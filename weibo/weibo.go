@@ -24,7 +24,7 @@ const mobileUserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) 
 
 // ErrWalled means the API returned ok:-100, meaning the surface requires a
 // logged-in session. User profile and post timeline are examples.
-var ErrWalled = errors.New("Weibo requires a logged-in session for this surface (exit 4)")
+var ErrWalled = errors.New("this surface requires a logged-in Weibo session")
 
 // ErrNotFound means the post or resource does not exist.
 var ErrNotFound = errors.New("not found")
