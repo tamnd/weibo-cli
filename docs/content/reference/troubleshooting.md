@@ -1,43 +1,67 @@
 ---
 title: "Troubleshooting"
-description: "The handful of things that trip people up, and how to fix each one."
+description: "The things that trip people up, and how to fix each one."
 weight: 40
 ---
 
-Most of these come down to network reality or how weibo-cli serves its data,
-not a bug. Fill this page out with the site-specific cases as you find them.
+Most issues come down to network reality, Weibo's access controls, or a
+session cookie that has expired — not a bug.
 
-## Requests start failing or returning 429
+## Exit 4: surface requires a login
 
-weibo-cli rate-limits like any public site. weibo already paces
-requests and retries the transient failures, but a hard limit still means
-backing off. Raise the delay between requests with `--rate` (for example
-`--rate 1s`), lower any concurrency you have set, and retry later. A burst of
-429 or 5xx responses is the site asking you to slow down, not a defect.
+`user` and `posts` return this when no session cookie is set or when the
+cookie is expired.
 
-## Nothing is found for something you expected
+```bash
+# Set the cookie
+export WEIBO_COOKIE='SUB=xxx; SUBP=yyy'
+weibo user 2656274875
+```
 
-The public surface is not the whole site. Some data sits behind a login, a
-region, or a page that only renders with JavaScript, and that part is not
-reachable without the right session. Check that the input is spelled the way the
-site uses it, try a broader query, and see whether the same thing is visible in
-a private browser window before assuming it is missing.
+**How to get a fresh cookie:**
 
-## A command needs a session
+1. Open [weibo.com](https://weibo.com) in Chrome and log in.
+2. Press F12, go to **Application → Cookies → weibo.com**.
+3. Copy the `SUB` and `SUBP` values.
+4. Set `WEIBO_COOKIE='SUB=<value>; SUBP=<value>'` in your shell.
 
-Where a surface is gated, weibo reads a cookie or token you supply
-rather than logging in for you. Pass it on the command that needs it and keep it
-out of your shell history. Commands that work without one stay anonymous.
+Note: the visitor token flow (`genvisitor2`) returns a `sub`/`subp` pair but
+it requires a JS-driven cross-domain activation step that cannot be replicated
+in pure HTTP without a browser. There is no workaround — a real logged-in
+session is the only option for these surfaces.
+
+## Requests failing or returning 429
+
+Weibo rate-limits like any public site. `weibo` already paces requests and
+retries transient failures, but a hard limit still means backing off.
+
+Raise the delay between requests:
+
+```bash
+weibo posts 2656274875 --rate 2s
+```
+
+Lower any parallelism in scripts that call `weibo` in a loop, and retry later.
+A burst of 429 or 5xx responses is the site asking you to slow down, not a
+defect.
+
+## Nothing found for something you expected
+
+The public surface is not the whole site. Some data requires JavaScript
+rendering, regional access, or a logged-in session, and that part is not
+reachable without the right setup. Check that the id is correct, verify that
+the content is visible in a private browser window, and confirm you are not
+hitting a rate limit.
 
 ## The binary is not on your PATH
 
-`go install` puts the binary in `$(go env GOPATH)/bin` (usually `~/go/bin`), and
-a release archive leaves it wherever you unpacked it. If your shell cannot find
-`weibo`, add that directory to your `PATH`. See
+`go install` puts the binary in `$(go env GOPATH)/bin` (usually `~/go/bin`),
+and a release archive leaves it wherever you unpacked it. If your shell cannot
+find `weibo`, add that directory to your `PATH`. See
 [installation](/getting-started/installation/).
 
-## Seeing what weibo actually did
+## Seeing what weibo actually sent
 
-When something behaves unexpectedly, `-v` adds per-request detail so you can see
-the URLs it hit and the responses it got. That is usually enough to tell a rate
-limit apart from a genuinely empty result.
+Pass `-q=false` to keep progress output even in a script, or run with
+`--quiet=false` to confirm which endpoints are being called. There is no
+`-v` verbose flag; the progress lines on stderr are the visibility mechanism.
