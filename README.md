@@ -117,18 +117,25 @@ Keep it out of shell history by using the environment variable.
 ### Global flags
 
 ```
--o, --output    table|json|jsonl|csv|tsv|url   (auto: table on TTY, jsonl when piped)
-    --fields    comma-separated columns to keep, in order
-    --no-header omit the header row
-    --template  Go text/template applied per record
--n, --limit     max records (command default when 0)
-    --cookie    session cookie for gated surfaces ("SUB=xxx; SUBP=yyy")
+-o, --output     table|list|markdown|json|jsonl|csv|tsv|url|raw
+                 (auto: table on TTY, jsonl when piped)
+    --fields     comma-separated columns to keep, in order
+    --no-header  omit the header row
+    --template   Go text/template applied per record
+-n, --limit      max records (command default when 0)
+    --cookie     session cookie for gated surfaces ("SUB=xxx; SUBP=yyy")
     --user-agent override the User-Agent header
-    --rate      min delay between requests (default 500ms)
-    --timeout   per-request timeout (default 30s)
-    --retries   retry attempts on 429/5xx (default 3)
--q, --quiet     suppress progress output on stderr
-    --color     auto|always|never
+    --rate       min delay between requests (default 500ms)
+    --timeout    per-request timeout (default 30s)
+    --retries    retry attempts on 429/5xx (default 3)
+-q, --quiet      suppress progress output on stderr
+-v, --verbose    increase verbosity (repeatable)
+    --color      auto|always|never
+    --dry-run    print actions without performing them
+    --no-cache   bypass on-disk caches
+    --data-dir   override the data directory
+    --db         tee every record into a store (e.g. out.db)
+    --profile    named profile to load
 ```
 
 ## How it works
@@ -184,7 +191,7 @@ make test    # go test ./...
 make vet     # go vet ./...
 ```
 
-Requires Go 1.23+.
+Requires Go 1.26+.
 
 ## Releasing
 

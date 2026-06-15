@@ -60,7 +60,7 @@ Available on every command:
 
 | Flag | Default | Meaning |
 |---|---|---|
-| `-o, --output` | auto | `table`, `json`, `jsonl`, `csv`, `tsv`, `url` |
+| `-o, --output` | auto | `table`, `list`, `markdown`, `json`, `jsonl`, `csv`, `tsv`, `url`, `raw` |
 | `-n, --limit` | command default | Max records; `0` means use the command default |
 | `--fields` | all | Comma-separated columns to keep, in order |
 | `--template` | none | Go `text/template` applied per record |
@@ -71,7 +71,13 @@ Available on every command:
 | `--timeout` | `30s` | Per-request timeout |
 | `--retries` | `3` | Retry attempts on 429 or 5xx |
 | `-q, --quiet` | off | Suppress progress output on stderr |
-| `--color` | auto | `auto`, `always`, or `never` |
+| `-v, --verbose` | `0` | Increase verbosity (repeatable: `-vv`) |
+| `--color` | `auto` | `auto`, `always`, or `never` |
+| `--dry-run` | off | Print actions without performing them |
+| `--no-cache` | off | Bypass on-disk caches |
+| `--data-dir` | `~/.local/share/weibo` | Override the data directory |
+| `--db` | none | Tee every record into a store (e.g. `out.db`, `postgres://...`) |
+| `--profile` | none | Named profile to load |
 
 The output default adapts to where it is going: an aligned table when writing
 to a terminal, JSONL when piped. See [output formats](/reference/output/).

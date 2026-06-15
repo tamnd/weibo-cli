@@ -29,12 +29,13 @@ func BaseIdentity() kit.Identity {
 	return kit.Identity{
 		Binary: "weibo",
 		Short:  "A command line for Weibo (微博).",
-		Long: `weibo reads public Weibo (微博) data and prints clean, pipeable records.
+		Long: `weibo reads Weibo (微博) data and prints clean, pipeable records.
 
 It reads hot trending topics, individual posts, comment threads, and search
-suggestions through Weibo's public JSON API. No API key or login is required.
+suggestions without any account. User profiles and post timelines are also
+available with a session cookie (--cookie or WEIBO_COOKIE).
 
-Records come out as table, JSON, JSONL, CSV, TSV, url, or raw.
+Records come out as table, list, markdown, JSON, JSONL, CSV, TSV, url, or raw.
 
 weibo is an independent tool and is not affiliated with Weibo or Sina.`,
 		Site: "https://weibo.com",

@@ -42,7 +42,7 @@ few days to a few weeks depending on your session), copy fresh values.
 
 | Flag | Default | Meaning |
 |---|---|---|
-| `-o, --output` | auto | `table`, `json`, `jsonl`, `csv`, `tsv`, `url` |
+| `-o, --output` | auto | `table`, `list`, `markdown`, `json`, `jsonl`, `csv`, `tsv`, `url`, `raw` |
 | `-n, --limit` | command default | Max records per command |
 | `--fields` | all | Comma-separated columns to keep, in order |
 | `--template` | none | Go `text/template` applied per record |
@@ -53,7 +53,13 @@ few days to a few weeks depending on your session), copy fresh values.
 | `--timeout` | `30s` | Per-request timeout |
 | `--retries` | `3` | Retry attempts on 429 or 5xx |
 | `-q, --quiet` | off | Suppress progress output on stderr |
-| `--color` | auto | `auto`, `always`, or `never` |
+| `-v, --verbose` | `0` | Increase verbosity (repeatable) |
+| `--color` | `auto` | `auto`, `always`, or `never` |
+| `--dry-run` | off | Print actions without performing them |
+| `--no-cache` | off | Bypass on-disk caches |
+| `--data-dir` | `~/.local/share/weibo` | Override the data directory |
+| `--db` | none | Tee every record into a store |
+| `--profile` | none | Named profile to load |
 
 ## Rate limiting and retries
 
