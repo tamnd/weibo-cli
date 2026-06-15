@@ -79,6 +79,85 @@ func (c *Client) Comments(ctx context.Context, id string, limit int) ([]Comment,
 	return out, nil
 }
 
+// UserByID returns the public profile for a Weibo user by numeric uid.
+// Requires a session cookie (SUB=xxx) — exits ErrWalled without one.
+func (c *Client) UserByID(ctx context.Context, uid string) (User, error) {
+	if c.cfg.Cookie == "" {
+		return User{}, ErrWalled
+	}
+	rawURL := c.cfg.MobileBaseURL + "/api/container/getIndex?containerid=100505" + uid
+	b, err := c.getMobile(ctx, rawURL)
+	if err != nil {
+		return User{}, err
+	}
+	var resp userProfileResponse
+	if err := json.Unmarshal(b, &resp); err != nil {
+		return User{}, fmt.Errorf("decode user: %w", err)
+	}
+	switch resp.OK {
+	case 1:
+		u := resp.Data.UserInfo
+		if u.ID == 0 {
+			return User{}, ErrNotFound
+		}
+		return userFrom(u), nil
+	case -100:
+		return User{}, ErrWalled
+	default:
+		return User{}, ErrNotFound
+	}
+}
+
+// PostsByUID returns posts from a user's timeline (one page of ~10).
+// Requires a session cookie (SUB=xxx) — exits ErrWalled without one.
+func (c *Client) PostsByUID(ctx context.Context, uid string, page, limit int) ([]Post, error) {
+	if c.cfg.Cookie == "" {
+		return nil, ErrWalled
+	}
+	rawURL := fmt.Sprintf("%s/api/container/getIndex?containerid=107603%s&page=%d",
+		c.cfg.MobileBaseURL, uid, page)
+	b, err := c.getMobile(ctx, rawURL)
+	if err != nil {
+		return nil, err
+	}
+	var resp userTimelineResponse
+	if err := json.Unmarshal(b, &resp); err != nil {
+		return nil, fmt.Errorf("decode posts: %w", err)
+	}
+	if resp.OK != 1 {
+		return nil, ErrWalled
+	}
+	var out []Post
+	for _, card := range resp.Data.Cards {
+		if card.CardType != 9 || card.MBlog.ID == "" {
+			continue
+		}
+		out = append(out, postFrom(card.MBlog))
+		if limit > 0 && len(out) >= limit {
+			break
+		}
+	}
+	return out, nil
+}
+
+// ExtendStatus fetches the full longTextContent for a post with isLongText=true.
+// Works anonymously without a session cookie.
+func (c *Client) ExtendStatus(ctx context.Context, id string) (string, error) {
+	rawURL := c.cfg.MobileBaseURL + "/statuses/extend?id=" + id
+	b, err := c.getMobile(ctx, rawURL)
+	if err != nil {
+		return "", err
+	}
+	var resp extendResponse
+	if err := json.Unmarshal(b, &resp); err != nil {
+		return "", fmt.Errorf("decode extend: %w", err)
+	}
+	if resp.OK != 1 {
+		return "", ErrNotFound
+	}
+	return resp.Data.LongTextContent, nil
+}
+
 // Suggest returns search autocomplete suggestions for the given query.
 func (c *Client) Suggest(ctx context.Context, query string, limit int) ([]Suggestion, error) {
 	rawURL := c.cfg.BaseURL + "/ajax/side/search?q=" + query

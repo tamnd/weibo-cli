@@ -6,6 +6,8 @@ weight: 20
 featured: true
 ---
 
-Each guide is built around a job rather than a command. Add one per real task as
-you build out weibo. They assume you have run the
+Task-oriented walkthroughs. Each guide is built around a job rather than a
+command. They assume you have run the
 [quick start](/getting-started/quick-start/).
+
+For the full command and flag reference, see the [CLI reference](/reference/cli/).

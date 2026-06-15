@@ -385,6 +385,259 @@ func TestParseStatusID(t *testing.T) {
 	}
 }
 
+// ─── user ────────────────────────────────────────────────────────────────────
+
+const mockUserResponse = `{
+  "ok": 1,
+  "data": {
+    "userInfo": {
+      "id": 2656274875,
+      "screen_name": "央视新闻",
+      "description": "中央电视台新闻中心官方微博",
+      "verified": true,
+      "verified_reason": "中央电视台新闻中心官方账号",
+      "gender": "m",
+      "location": "北京 朝阳区",
+      "followers_count": "1.8亿",
+      "follow_count": 244,
+      "statuses_count": 688481,
+      "avatar_hd": "https://tvax3.sinaimg.cn/crop.0.0.300.300.1024/9e9cb5adly8h9k7xd99ddj208c08cwfe.jpg"
+    }
+  }
+}`
+
+const mockUserWalledResponse = `{"ok": -100, "data": {}}`
+
+const mockPostsResponse = `{
+  "ok": 1,
+  "data": {
+    "cards": [
+      {
+        "card_type": 9,
+        "mblog": {
+          "id": "5309997458393240",
+          "bid": "R4c4VzdsQ",
+          "text": "测试帖子",
+          "created_at": "Mon Jun 15 09:05:12 +0800 2026",
+          "source": "微博视频号",
+          "reposts_count": 10,
+          "comments_count": 5,
+          "attitudes_count": 50,
+          "isLongText": false,
+          "pic_num": 0,
+          "user": {"id": 2656274875, "screen_name": "央视新闻"}
+        }
+      },
+      {
+        "card_type": 11,
+        "mblog": {"id": ""}
+      }
+    ]
+  }
+}`
+
+const mockExtendResponse = `{
+  "ok": 1,
+  "data": {
+    "longTextContent": "这是一篇超长微博的完整正文，包含了原来被省略的内容。"
+  }
+}`
+
+func newTestClientWithCookie(ts *httptest.Server, cookie string) *weibo.Client {
+	cfg := weibo.DefaultConfig()
+	cfg.BaseURL = ts.URL
+	cfg.MobileBaseURL = ts.URL
+	cfg.Rate = 0
+	cfg.Cookie = cookie
+	return weibo.NewClient(cfg)
+}
+
+func TestUserWalledWithoutCookie(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(mockUserResponse))
+	}))
+	defer srv.Close()
+	_, err := newTestClient(srv).UserByID(context.Background(), "2656274875")
+	if err == nil {
+		t.Fatal("expected ErrWalled without a cookie")
+	}
+}
+
+func TestUserSendsCookie(t *testing.T) {
+	var gotCookie string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotCookie = r.Header.Get("Cookie")
+		_, _ = w.Write([]byte(mockUserResponse))
+	}))
+	defer srv.Close()
+	_, err := newTestClientWithCookie(srv, "SUB=abc123").UserByID(context.Background(), "2656274875")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotCookie != "SUB=abc123" {
+		t.Errorf("server received Cookie %q, want SUB=abc123", gotCookie)
+	}
+}
+
+func TestUserParses(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(mockUserResponse))
+	}))
+	defer srv.Close()
+
+	u, err := newTestClientWithCookie(srv, "SUB=abc").UserByID(context.Background(), "2656274875")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u.ID != 2656274875 {
+		t.Errorf("id = %d, want 2656274875", u.ID)
+	}
+	if u.ScreenName != "央视新闻" {
+		t.Errorf("screen_name = %q", u.ScreenName)
+	}
+	if !u.Verified {
+		t.Error("verified should be true")
+	}
+	if u.VerifiedFor != "中央电视台新闻中心官方账号" {
+		t.Errorf("verified_for = %q", u.VerifiedFor)
+	}
+	if u.Followers != "1.8亿" {
+		t.Errorf("followers = %q, want 1.8亿", u.Followers)
+	}
+	if u.Following != 244 {
+		t.Errorf("following = %d, want 244", u.Following)
+	}
+	if u.Posts != 688481 {
+		t.Errorf("posts = %d, want 688481", u.Posts)
+	}
+	if u.URL == "" {
+		t.Error("url is empty")
+	}
+}
+
+func TestUserWalledResponse(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(mockUserWalledResponse))
+	}))
+	defer srv.Close()
+	_, err := newTestClientWithCookie(srv, "SUB=expired").UserByID(context.Background(), "2656274875")
+	if err == nil {
+		t.Fatal("expected error for ok:-100")
+	}
+}
+
+// ─── posts ───────────────────────────────────────────────────────────────────
+
+func TestPostsWalledWithoutCookie(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(mockPostsResponse))
+	}))
+	defer srv.Close()
+	_, err := newTestClient(srv).PostsByUID(context.Background(), "2656274875", 1, 0)
+	if err == nil {
+		t.Fatal("expected ErrWalled without a cookie")
+	}
+}
+
+func TestPostsFiltersCardType(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(mockPostsResponse))
+	}))
+	defer srv.Close()
+
+	posts, err := newTestClientWithCookie(srv, "SUB=abc").PostsByUID(context.Background(), "2656274875", 1, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// card_type=11 and mblog.id="" should be filtered out; only 1 card_type=9
+	if len(posts) != 1 {
+		t.Fatalf("got %d posts, want 1 (card_type=11 should be filtered)", len(posts))
+	}
+	p := posts[0]
+	if p.ID != "5309997458393240" {
+		t.Errorf("id = %q", p.ID)
+	}
+	if p.Text != "测试帖子" {
+		t.Errorf("text = %q, want 测试帖子", p.Text)
+	}
+}
+
+func TestPostsLimitRespected(t *testing.T) {
+	body := `{
+	  "ok": 1,
+	  "data": {
+	    "cards": [
+	      {"card_type": 9, "mblog": {"id": "1", "bid": "a", "text": "A", "created_at": "Mon Jun 15 09:00:00 +0800 2026", "source": "s", "user": {"id": 1, "screen_name": "u"}}},
+	      {"card_type": 9, "mblog": {"id": "2", "bid": "b", "text": "B", "created_at": "Mon Jun 15 09:01:00 +0800 2026", "source": "s", "user": {"id": 1, "screen_name": "u"}}},
+	      {"card_type": 9, "mblog": {"id": "3", "bid": "c", "text": "C", "created_at": "Mon Jun 15 09:02:00 +0800 2026", "source": "s", "user": {"id": 1, "screen_name": "u"}}}
+	    ]
+	  }
+	}`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(body))
+	}))
+	defer srv.Close()
+
+	posts, err := newTestClientWithCookie(srv, "SUB=abc").PostsByUID(context.Background(), "1", 1, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(posts) != 2 {
+		t.Fatalf("got %d posts with limit=2, want 2", len(posts))
+	}
+}
+
+// ─── extend ──────────────────────────────────────────────────────────────────
+
+func TestExtendParses(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(mockExtendResponse))
+	}))
+	defer srv.Close()
+
+	text, err := newTestClient(srv).ExtendStatus(context.Background(), "5309997458393240")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if text != "这是一篇超长微博的完整正文，包含了原来被省略的内容。" {
+		t.Errorf("longTextContent = %q", text)
+	}
+}
+
+// ─── parseUID ────────────────────────────────────────────────────────────────
+
+func TestParseUID(t *testing.T) {
+	cases := []struct {
+		input string
+		want  string
+		err   bool
+	}{
+		{"2656274875", "2656274875", false},
+		{"https://weibo.com/u/2656274875", "2656274875", false},
+		{"https://m.weibo.cn/u/2656274875", "2656274875", false},
+		{"https://m.weibo.cn/profile/2656274875", "2656274875", false},
+		{"", "", true},
+		{"notanumber", "", true},
+		{"https://weibo.com/cctv_news", "", true},
+	}
+	for _, tc := range cases {
+		got, err := weibo.ParseUID(tc.input)
+		if tc.err {
+			if err == nil {
+				t.Errorf("ParseUID(%q) expected error", tc.input)
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("ParseUID(%q) error: %v", tc.input, err)
+			continue
+		}
+		if got != tc.want {
+			t.Errorf("ParseUID(%q) = %q, want %q", tc.input, got, tc.want)
+		}
+	}
+}
+
 func contains(s, sub string) bool {
 	return len(s) >= len(sub) && (s == sub || len(sub) == 0 || indexOf(s, sub) >= 0)
 }

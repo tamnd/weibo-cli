@@ -48,6 +48,37 @@ type Suggestion struct {
 	IsHot bool   `json:"is_hot"`
 }
 
+// User is a public Weibo profile. Requires a session cookie.
+type User struct {
+	ID          int64  `json:"id"`
+	ScreenName  string `json:"screen_name"`
+	Description string `json:"description"    table:",truncate"`
+	Verified    bool   `json:"verified"`
+	VerifiedFor string `json:"verified_for"`
+	Gender      string `json:"gender"`
+	Location    string `json:"location"`
+	Followers   string `json:"followers"`
+	Following   int    `json:"following"      table:",right"`
+	Posts       int    `json:"posts"          table:",right"`
+	Avatar      string `json:"avatar"         table:",truncate"`
+	URL         string `json:"url"            kit:"url" table:",truncate"`
+}
+
+// Post is one item from a user's post timeline. Requires a session cookie.
+type Post struct {
+	ID        string `json:"id"`
+	Bid       string `json:"bid"`
+	Text      string `json:"text"      kit:"body"          table:",truncate"`
+	CreatedAt string `json:"created_at"`
+	Source    string `json:"source"`
+	Reposts   int    `json:"reposts"   table:",right"`
+	Comments  int    `json:"comments"  table:",right"`
+	Likes     int    `json:"likes"     table:",right"`
+	IsLong    bool   `json:"is_long"`
+	PicNum    int    `json:"pic_num"   table:",right"`
+	URL       string `json:"url"       kit:"url"           table:",truncate"`
+}
+
 // ─── wire types ──────────────────────────────────────────────────────────────
 
 type hotSearchResponse struct {
@@ -122,4 +153,44 @@ type wireSuggestion struct {
 	Suggestion string `json:"suggestion"`
 	Count      int    `json:"count"`
 	TopFlag    int    `json:"top_flag"`
+}
+
+type userProfileResponse struct {
+	OK   int `json:"ok"`
+	Data struct {
+		UserInfo wireProfileUser `json:"userInfo"`
+	} `json:"data"`
+}
+
+type wireProfileUser struct {
+	ID             int64  `json:"id"`
+	ScreenName     string `json:"screen_name"`
+	Description    string `json:"description"`
+	Verified       bool   `json:"verified"`
+	VerifiedReason string `json:"verified_reason"`
+	Gender         string `json:"gender"`
+	Location       string `json:"location"`
+	FollowersCount string `json:"followers_count"`
+	FollowCount    int    `json:"follow_count"`
+	StatusesCount  int    `json:"statuses_count"`
+	AvatarHD       string `json:"avatar_hd"`
+}
+
+type userTimelineResponse struct {
+	OK   int `json:"ok"`
+	Data struct {
+		Cards []wireTimelineCard `json:"cards"`
+	} `json:"data"`
+}
+
+type wireTimelineCard struct {
+	CardType int        `json:"card_type"`
+	MBlog    wireStatus `json:"mblog"`
+}
+
+type extendResponse struct {
+	OK   int `json:"ok"`
+	Data struct {
+		LongTextContent string `json:"longTextContent"`
+	} `json:"data"`
 }
