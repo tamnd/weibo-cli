@@ -1,6 +1,6 @@
 title       = "weibo"
 baseURL     = "https://weibo-cli.tamnd.com/"
-description = "Browse Weibo hot search topics (微博热搜)"
+description = "A command line for Weibo (微博). Read hot search topics, posts, comments, user profiles, and timelines. One pure-Go binary, no API key."
 contentDir  = "content"
 outputDir   = "public"
 theme       = "tago-doks"
